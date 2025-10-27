@@ -1,0 +1,392 @@
+# Hadoop/Spark Command Cheat Sheet - NYC Taxi Analysis
+
+## 📂 HDFS Commands
+
+### Basic File Operations
+```bash
+# List files in HDFS
+hdfs ls /user/hadoop/taxi_data/
+
+# Remove file or directory
+hdfs rm /path/to/file
+hdfs rm -r /path/to/directory
+
+# View file contents
+hdfs cat /user/hadoop/taxi_data/mapreduce_yellow_output/part-00000
+
+# View first N lines
+hdfs cat /path/to/file | head -20
+
+# Copy from HDFS to local filesystem
+hdfs get /user/hadoop/taxi_data/input ~/local_directory/
+
+# Copy from local to HDFS
+hdfs put local_file.csv /user/hadoop/taxi_data/
+
+# Check disk usage
+hdfs du -sh /user/hadoop/taxi_data/
+```
+
+---
+
+## 🔥 PySpark Commands
+
+### Run PySpark Scripts
+```bash
+# Basic execution
+spark-submit script_name.py
+
+# With specific configuration
+spark-submit \
+  --master local[*] \
+  --driver-memory 3g \
+  script_name.py
+
+# View Spark job history
+# Open browser: http://localhost:4040 (during job)
+# Open browser: http://localhost:18080 (history server)
+```
+
+### Data Cleaning Script
+```bash
+# Run enhanced data cleaning and CSV conversion
+spark-submit convert_to_csv.py
+```
+
+**What it does:**
+- Loads Parquet data from HDFS
+- Joins with zone lookup table
+- Applies 8 cleaning rules (removes negatives, outliers, unknown boroughs, invalid passengers)
+- Exports cleaned CSV to HDFS for MapReduce
+- Shows detailed cleaning report
+
+---
+
+## 🗺️ MapReduce Commands
+
+### Run MapReduce Job
+```bash
+# Delete old output (required before each run)
+hdfs rm -r /user/hadoop/taxi_data/mapreduce_yellow_output
+
+# Run MapReduce streaming job
+hadoop jar $HADOOP_HOME/share/hadoop/tools/lib/hadoop-streaming-*.jar \
+  -input /user/hadoop/taxi_data/mapreduce_input \
+  -output /user/hadoop/taxi_data/mapreduce_yellow_output \
+  -mapper "python3 mapper.py" \
+  -reducer "python3 reducer.py" \
+  -file mapper.py \
+  -file reducer.py
+```
+
+**What it does:**
+- Map Phase: Reads CSV, emits (borough, fare) pairs
+- Shuffle Phase: Groups all fares by borough
+- Reduce Phase: Aggregates statistics (sum, count, avg, min, max)
+
+### View MapReduce Results
+```bash
+# View final output
+hdfs cat /user/hadoop/taxi_data/mapreduce_yellow_output/part-00000
+
+# View logs for debugging
+yarn logs -applicationId application_XXXXXXXXXX_XXXX
+
+# View specific log files
+yarn logs -applicationId application_XXXXXXXXXX_XXXX -log_files stderr
+```
+
+---
+
+## 📊 YARN Commands
+
+### Job Management
+```bash
+# List running applications
+yarn application -list
+
+# Kill a running job
+yarn application -kill application_XXXXXXXXXX_XXXX
+
+# View application logs
+yarn logs -applicationId application_XXXXXXXXXX_XXXX
+
+# Save logs to file
+yarn logs -applicationId application_XXXXXXXXXX_XXXX > job_logs.txt
+
+# List available log types
+yarn logs -applicationId application_XXXXXXXXXX_XXXX -list_logs
+
+# Check YARN resource manager
+# Open browser: http://localhost:8088
+```
+
+---
+
+## 🧪 Testing MapReduce Locally
+
+### Test Mapper
+```bash
+# Test with sample data
+hdfs cat /user/hadoop/taxi_data/mapreduce_input/part-* | head -100 | python3 mapper.py 2> mapper_log.txt
+
+# View mapper output
+cat mapper_log.txt
+```
+
+### Test Reducer
+```bash
+# Test full pipeline with small sample
+hdfs cat /user/hadoop/taxi_data/mapreduce_input/part-* | head -1000 | \
+  python3 mapper.py 2> mapper_log.txt | \
+  sort | \
+  python3 reducer.py 2> reducer_log.txt > results.txt
+
+# View outputs
+cat mapper_log.txt
+cat reducer_log.txt
+cat results.txt
+```
+
+---
+
+## 📁 File Transfer Commands
+
+### Copy from HDFS to Local
+```bash
+# Create local directory
+mkdir -p ~/taxi_assignment/hdfs_data
+
+# Copy specific folders from HDFS
+hdfs get /user/hadoop/taxi_data/input ~/taxi_assignment/hdfs_data/input
+hdfs get /user/hadoop/taxi_data/zones ~/taxi_assignment/hdfs_data/zones
+hdfs get /user/hadoop/taxi_data/mapreduce_input ~/taxi_assignment/hdfs_data/mapreduce_input
+hdfs get /user/hadoop/taxi_data/mapreduce_yellow_output ~/taxi_assignment/hdfs_data/mapreduce_yellow_output
+
+# Verify copied files
+ls -lh ~/taxi_assignment/hdfs_data/
+```
+
+### Copy from Linux to Windows (WSL/Mounted Drive)
+```bash
+# Copy entire directory to Windows OneDrive
+sudo cp -r ~/taxi_assignment/hdfs_data /mnt/c/Users/steph/OneDrive\ -\ GUSCanada/SCHOOL/Fall\ 2025/Advance\ Data\ Analytics/Advanced-Analytics/
+
+# Copy Python scripts
+sudo cp ~/taxi_assignment/*.py /mnt/c/Users/steph/OneDrive\ -\ GUSCanada/SCHOOL/Fall\ 2025/Advance\ Data\ Analytics/Advanced-Analytics/
+
+# Verify on Windows
+ls -lh /mnt/c/Users/steph/OneDrive\ -\ GUSCanada/SCHOOL/Fall\ 2025/Advance\ Data\ Analytics/Advanced-Analytics/
+```
+
+---
+
+## 🐍 Python Script Management
+
+### View Script Contents
+```bash
+# Display file contents
+cat convert_to_csv.py
+cat mapper.py
+cat reducer.py
+
+# View with line numbers
+cat -n mapper.py
+
+# View first/last N lines
+head -20 convert_to_csv.py
+tail -20 reducer.py
+```
+
+### Edit Scripts
+```bash
+# Edit with nano
+nano mapper.py
+
+# Edit with vi
+vi reducer.py
+
+# Make executable
+chmod +x script.py
+```
+
+---
+
+## 🔍 Debugging & Monitoring
+
+### Check Job Status
+```bash
+# View job counters and statistics
+hadoop job -status job_XXXXXXXXXX_XXXX
+
+# View running tasks
+hadoop job -list
+
+# Check HDFS health
+hdfs fsck /user/hadoop/taxi_data/ -files -blocks
+```
+
+### System Resources
+```bash
+# Check disk space
+df -h
+hdfs du -sh /user/hadoop/
+
+# Check memory usage
+free -h
+
+# Check running processes
+ps aux | grep java
+ps aux | grep spark
+```
+
+### Check Services
+```bash
+# Check if Hadoop services are running
+jps
+
+# Should show:
+# - NameNode
+# - DataNode
+# - ResourceManager
+# - NodeManager
+# - SecondaryNameNode
+```
+
+---
+
+## 📊 Data Analysis Commands
+
+### Quick Data Inspection
+```bash
+# Count records
+hdfs cat /user/hadoop/taxi_data/mapreduce_input/part-* | wc -l
+
+# View sample records
+hdfs cat /user/hadoop/taxi_data/mapreduce_input/part-* | head -10
+
+# Search for specific borough
+hdfs cat /user/hadoop/taxi_data/mapreduce_input/part-* | grep "Queens" | head -5
+
+# Get unique boroughs
+hdfs cat /user/hadoop/taxi_data/mapreduce_input/part-* | cut -d',' -f1 | sort | uniq
+```
+
+---
+
+## 🚀 Complete Workflow Commands
+
+### End-to-End Pipeline
+```bash
+# Step 1: Clean data and create CSV for MapReduce
+spark-submit convert_to_csv.py
+
+# Step 2: Delete old MapReduce output
+hdfs rm -r /user/hadoop/taxi_data/mapreduce_yellow_output
+
+# Step 3: Run MapReduce job
+hadoop jar $HADOOP_HOME/share/hadoop/tools/lib/hadoop-streaming-*.jar \
+  -input /user/hadoop/taxi_data/mapreduce_input \
+  -output /user/hadoop/taxi_data/mapreduce_yellow_output \
+  -mapper "python3 mapper.py" \
+  -reducer "python3 reducer.py" \
+  -file mapper.py \
+  -file reducer.py
+
+# Step 4: View results
+hdfs cat /user/hadoop/taxi_data/mapreduce_yellow_output/part-00000
+
+# Step 5: Copy results to local
+hdfs get /user/hadoop/taxi_data/mapreduce_yellow_output ~/taxi_assignment/results/
+
+# Step 6: Copy to Windows
+sudo cp -r ~/taxi_assignment/results /mnt/c/Users/steph/OneDrive\ -\ GUSCanada/SCHOOL/Fall\ 2025/Advance\ Data\ Analytics/Advanced-Analytics/
+```
+
+---
+
+## 🛠️ Troubleshooting Commands
+
+### Common Issues
+
+**Issue: Output directory already exists**
+```bash
+# Solution: Delete it first
+hdfs rm -r /user/hadoop/taxi_data/mapreduce_yellow_output
+```
+
+**Issue: Cannot find logs**
+```bash
+# Check if logs are aggregated
+yarn logs -applicationId application_XXXXXXXXXX_XXXX
+
+# If not found, check web UI
+# http://localhost:8088 → Click job → Logs
+```
+
+**Issue: Script not found in MapReduce**
+```bash
+# Ensure you're in the correct directory
+cd ~/taxi_assignment
+
+# Verify files exist
+ls -lh mapper.py reducer.py
+
+# Check file permissions
+chmod 755 mapper.py reducer.py
+```
+
+**Issue: Permission denied copying to Windows**
+```bash
+# Use sudo
+sudo cp -r ~/source /mnt/c/destination/
+
+# Or change ownership
+sudo chown -R hadoop:hadoop ~/taxi_assignment/
+```
+
+---
+
+## 📝 Quick Reference Summary
+
+| Task | Command |
+|------|---------|
+| **Run PySpark script** | `spark-submit script.py` |
+| **Run MapReduce** | `hadoop jar ...streaming... -mapper ... -reducer ...` |
+| **View HDFS file** | `hdfs cat /path/to/file` |
+| **Copy from HDFS** | `hdfs get /hdfs/path /local/path` |
+| **Delete HDFS directory** | `hdfs rm -r /path` |
+| **View MapReduce results** | `hdfs cat /output/part-00000` |
+| **View YARN logs** | `yarn logs -applicationId app_id` |
+| **Copy to Windows** | `sudo cp -r ~/source /mnt/c/destination/` |
+| **Check Hadoop services** | `jps` |
+| **YARN Web UI** | `http://localhost:8088` |
+
+---
+
+## 🎓 Key File Locations
+
+```
+HDFS:
+/user/hadoop/taxi_data/
+├── input/                          # Original Parquet data
+├── zones/                          # Zone lookup CSV
+├── mapreduce_input/               # Cleaned CSV for MapReduce
+└── mapreduce_yellow_output/       # MapReduce results
+
+Local:
+~/taxi_assignment/
+├── convert_to_csv.py              # Data cleaning script
+├── mapper.py                       # MapReduce mapper
+├── reducer.py                      # MapReduce reducer
+├── borough_diagnostics.py         # Diagnostic analysis
+└── hdfs_data/                     # Local copy of HDFS data
+
+Windows:
+C:\Users\steph\OneDrive - GUSCanada\SCHOOL\Fall 2025\Advance Data Analytics\Advanced-Analytics\
+└── (All copied files)
+```
+
+---
+
+**💡 Pro Tip:** Save this cheat sheet for future reference! These commands work for any Hadoop/Spark project.
