@@ -1,0 +1,6 @@
+ini
+[wsl2]
+memory=70GB
+processors=8
+swap=16GB
+localhostForwarding=true
